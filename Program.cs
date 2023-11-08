@@ -29,49 +29,48 @@ namespace DiagnosticScenarios
                 {
                     webBuilder.UseStartup<Startup>();
                 });
-public static IWebHostBuilder CreateHealthCheck(string[] args)
-{
-    // Custom kestrel on port 7000 with a single thread priority 4
-    var liveHostBuilder = WebHost.CreateDefaultBuilder(args)
-        .ConfigureKestrel((context, options) =>
-        {
-            // Configure a dedicated thread with priority 4 for the live endpoint
-            options.ListenAnyIP(7000, listenOptions =>
-            {
-                listenOptions.UseThreadingSettings(new ThreadingSettings()
+        public static IHostBuilder CreateHealthCheck(string[] args) {
+            // Custom kestrel on port 7000 with a single thread priority 4
+            var liveHostBuilder = WebHost.CreateDefaultBuilder(args)
+                .ConfigureWebHostDefaults(webBuilder =>
                 {
-                    MinThreads = 1,
-                    MaxThreads = 1,
-                    ThreadPriority = ThreadPriority.AboveNormal
+                    webBuilder.UseKestrel(options =>
+                    {
+                        // Configure a dedicated thread with priority 4 for the live endpoint
+                        options.ListenAnyIP(7000, listenOptions =>
+                        {
+                            listenOptions.ThreadPool.Threads = 1;
+                            listenOptions.ThreadPool.SetMinimumThreads(1);
+                            listenOptions.ThreadPool.SetMaximumThreads(1);
+                            listenOptions.ThreadPool.Priority = 4;
+                        });
+                    });
+                });
+            // Create the application builder for the live endpoint
+            return liveHostBuilder.ConfigureServices(services =>
+            {
+                // Register the live endpoint handler
+                services.AddSingleton<IApplicationService, liveAppService>();
+            })
+            .Configure(app =>
+            {
+                // Add routing for the live endpoint
+                app.UseEndpoints(endpoints =>
+                {
+                    endpoints.MapGet("/live", async context =>
+                    {
+                        // Get the application service from the dependency injection container
+                        var appService = context.RequestServices.GetRequiredService<IApplicationService>();
+
+                        // Call the live endpoint handler
+                        var liveMessage = "OK";
+
+                        // Write the live message to the response
+                        context.Response.ContentType = "text/plain";
+                        await context.Response.WriteAsync(liveMessage);
+                    });
                 });
             });
-        })
-        .ConfigureServices(services =>
-        {
-            // Register the live endpoint handler
-            services.AddSingleton<IApplicationService, LiveApplicationService>();
-        })
-        .Configure(app =>
-        {
-            // Add routing for the live endpoint
-            app.UseEndpoints(endpoints =>
-            {
-                endpoints.MapGet("/live", async context =>
-                {
-                    // Get the application service from the dependency injection container
-                    var appService = context.RequestServices.GetRequiredService<IApplicationService>();
-
-                    // Call the live endpoint handler
-                    var liveMessage = "OK";
-
-                    // Write the live message to the response
-                    context.Response.ContentType = "text/plain";
-                    await context.Response.WriteAsync(liveMessage);
-                });
-            });
-        });
-
-    return liveHostBuilder;
-}
+        }
     }
 }

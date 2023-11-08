@@ -8,6 +8,32 @@ name: "Diagnostic scenarios sample debug target"
 urlFragment: "diagnostic-scenarios"
 description: "A .NET Core sample with methods that trigger undesirable behaviors to diagnose."
 ---
+# To get threadpool starvation
+
+Build and run the application locally
+```bash
+dotnet build
+dotnet run
+```
+
+To monitor the threadpool starvation, use dotnet-counters in a separate terminal and monitor the ThreadPool Queue Length increase
+```bash
+dotnet-counters monitor -n DiagnosticScenarios
+```
+
+Then in a different terminal, run [bombardier](https://github.com/codesenberg/bombardier) with 250 threads for 2 minutes
+```bash
+bombardier -c 250 -d 120s http://localhost:5000/api/diagscenario/tasksleepwait
+```
+
+To see if you can get health checks despite the threadpool starving, you should go to the health check endpoint
+```bash
+# Broken liveness check
+curl -v http://localhost:5000/health/live
+# Working liveness check .. hopefully
+curl -v http://localhost:7000/live
+```
+
 # Diagnostic scenarios sample debug target
 
 The sample debug target is a simple `webapi` application. The sample triggers undesirable behaviors for the [.NET Core diagnostics tutorials](https://docs.microsoft.com/dotnet/core/diagnostics/index#net-core-diagnostics-tutorials) to diagnose.
